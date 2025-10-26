@@ -5,16 +5,19 @@ This ensures consistency across all modules and makes it easy to update paths.
 
 import os
 
+MODEL_NAME="gpt-5-nano"
+MODEL_PROVIDER="openai"
+
 RAW_DATA_DIR = "data/raw"
 DOCX_DIR = "data/raw/docx"
 PDF_DIR = "data/raw/pdf"
 
-SAMPLE_DATA_DIR = "data/sample"
+SAMPLES_DATA_DIR = "data/samples"
 
-PROCESSED_DATA_DIR = "data/processed2"
+PROCESSED_DATA_DIR = "data/processed"
 
-CHROMA_PATH = "chroma2"
-BM25_DIR = "bm252"
+CHROMA_PATH = "chroma"
+BM25_DIR = "bm25"
 BM25_PATH = os.path.join(BM25_DIR, "bm25_index.pkl")
 
 CHUNK_SIZE = 1024

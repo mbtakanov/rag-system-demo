@@ -1,15 +1,17 @@
 import os
 import random
+from time import sleep
+from datetime import datetime
+import xml.etree.ElementTree as ET
+
 import requests
 from tqdm import tqdm
-from time import sleep
 from docx import Document
 from openai import OpenAI
 from PyPDF2 import PdfReader
-from datetime import datetime
 from dotenv import load_dotenv
-import xml.etree.ElementTree as ET
-from config import DOCX_DIR, PDF_DIR
+
+from src.config import DOCX_DIR, PDF_DIR
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

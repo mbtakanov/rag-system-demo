@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
@@ -25,5 +25,10 @@ class VectorStore:
             embedding_function=self.embeddings
         )
     
-    def search(self, query: str, k: int = 5) -> List[Tuple[Document, float]]:
-        return self.db.similarity_search_with_score(query, k=k)
+    def search(
+        self,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict[str, str]] = None
+    ) -> List[Tuple[Document, float]]:
+        return self.db.similarity_search_with_score(query, k=k, filter=filter)

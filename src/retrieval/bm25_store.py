@@ -1,7 +1,8 @@
 """BM25 keyword search index."""
 import pickle
+import numpy as np
 from rank_bm25 import BM25Okapi
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from langchain_core.documents import Document
 
@@ -26,9 +27,24 @@ class BM25Store:
             self.bm25 = data["bm25"]
             self.documents = data["documents"]
     
-    def search(self, query: str, k: int = 5) -> List[Tuple[Document, float]]:
+    def search(
+        self, 
+        query: str, 
+        k: int = 5,
+        filter: Optional[Dict[str, str]] = None
+    ) -> List[Tuple[Document, float]]:
         tokenized_query = query.lower().split()
         scores = self.bm25.get_scores(tokenized_query)
-        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
-        return [(self.documents[i], scores[i]) for i in top_indices]
+        top_indices = np.argsort(scores)[-k:][::-1]
+        results = []
+        for i in top_indices:
+            doc = self.documents[i]
+            
+            if filter:
+                if all(doc.metadata.get(k) == v for k, v in filter.items()):
+                    results.append((doc, scores[i]))
+            else:
+                results.append((doc, scores[i]))
+            
+        return results
 

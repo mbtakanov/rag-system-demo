@@ -3,6 +3,7 @@ Document chunking module.
 Implements multiple chunking strategies for different document types.
 """
 
+
 from typing import List, Literal
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
@@ -12,16 +13,22 @@ from langchain_text_splitters import (
     MarkdownHeaderTextSplitter
 )
 
-from config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL
+from src.config import CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL
 
 
 class DocumentChunker:
-    """Handles document chunking with multiple strategies."""
-    
     def __init__(self, 
                  chunk_size: int = CHUNK_SIZE,
                  chunk_overlap: int = CHUNK_OVERLAP,
                  embedding_model: str = EMBEDDING_MODEL):
+        """
+        Initialize the DocumentChunker with configuration parameters.
+        
+        Args:
+            chunk_size: Maximum size of each chunk in characters
+            chunk_overlap: Number of characters to overlap between chunks
+            embedding_model: Name of the OpenAI embedding model to use
+        """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.embedding_model = embedding_model
@@ -32,6 +39,20 @@ class DocumentChunker:
                        documents: List[Document],
                        strategy: Literal["auto", "semantic", "markdown", "recursive"] = "auto"
                        ) -> List[Document]:
+        """
+        Chunk a list of documents using the specified strategy.
+        
+        Args:
+            documents: List of documents to chunk
+            strategy: Chunking strategy to use
+                - "auto": Automatically select strategy based on document type
+                - "semantic": Use semantic similarity to split documents
+                - "markdown": Split based on markdown headers
+                - "recursive": Recursively split text by separators
+                
+        Returns:
+            List of chunked documents
+        """
         all_chunks = []
         
         for document in documents:
@@ -53,6 +74,15 @@ class DocumentChunker:
         return all_chunks
     
     def _get_document_type(self, document: Document) -> str:
+        """
+        Determine the document type based on metadata.
+        
+        Args:
+            document: Document to analyze
+            
+        Returns:
+            Document type: 'pdf', 'docx', 'markdown', or 'txt'
+        """
         source = document.metadata.get('source', '').lower()
         file_type = document.metadata.get('file_type', '').lower()
         
@@ -66,8 +96,20 @@ class DocumentChunker:
             return 'txt'
     
     def _chunk_by_type(self, document: Document, doc_type: str) -> List[Document]:
-        # For testing purposes, we're using different chunking strategies for different doc types.
-        # Probably it would be a good idea to add LLM chunking as well.
+        """
+        Chunk a document using a strategy based on its type.
+        
+        For testing purposes, we're using different chunking strategies for different doc types.
+        It would probably be a good idea to add LLM chunking as well.
+        TODO: The current chunking strategy is not very good. Improve it.
+        
+        Args:
+            document: Document to chunk
+            doc_type: Type of document ('pdf', 'docx', 'markdown', or 'txt')
+            
+        Returns:
+            List of chunked documents
+        """
         if doc_type == 'pdf':
             return self._semantic_chunk(document)
         elif doc_type in ['docx', 'markdown']:
@@ -76,6 +118,18 @@ class DocumentChunker:
             return self._recursive_chunk(document)
     
     def _semantic_chunk(self, document: Document) -> List[Document]:
+        """
+        Chunk a document using semantic similarity-based splitting.
+        
+        Uses embeddings to identify semantic boundaries and split at natural
+        content breakpoints rather than fixed character counts.
+        
+        Args:
+            document: Document to chunk semantically
+            
+        Returns:
+            List of semantically-chunked documents
+        """
         chunker = SemanticChunker(
             self.embeddings,
             breakpoint_threshold_type="percentile",
@@ -91,6 +145,18 @@ class DocumentChunker:
         return chunks
     
     def _markdown_chunk(self, document: Document) -> List[Document]:
+        """
+        Chunk a markdown document by headers, then by size.
+        
+        First splits by markdown headers (H1, H2, H3), then further splits
+        large sections using recursive character splitting to fit within chunk_size.
+        
+        Args:
+            document: Markdown document to chunk
+            
+        Returns:
+            List of markdown-chunked documents
+        """
         header_splitter = MarkdownHeaderTextSplitter(
             headers_to_split_on=[
                 ("#", "Header 1"),
@@ -126,6 +192,19 @@ class DocumentChunker:
         return final_chunks
     
     def _recursive_chunk(self, document: Document) -> List[Document]:
+        """
+        Chunk a document using recursive character text splitting.
+        
+        Splits text hierarchically by trying separators in order: paragraphs,
+        sentences, words, and finally characters. This approach preserves
+        as much semantic structure as possible while fitting within chunk_size.
+        
+        Args:
+            document: Document to chunk recursively
+            
+        Returns:
+            List of recursively-chunked documents
+        """
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
@@ -143,6 +222,20 @@ class DocumentChunker:
         return chunks
     
     def get_chunk_statistics(self, chunks: List[Document]) -> dict:
+        """
+        Calculate and return statistics about the chunked documents.
+        
+        Args:
+            chunks: List of chunked documents
+            
+        Returns:
+            Dictionary containing statistics:
+                - total_chunks: Total number of chunks
+                - avg_chunk_length: Average character length of chunks
+                - min_chunk_length: Minimum chunk length
+                - max_chunk_length: Maximum chunk length
+                - strategies_used: Count of chunks by strategy type
+        """
         if not chunks:
             return {'total_chunks': 0}
         
@@ -162,6 +255,7 @@ class DocumentChunker:
         }
 
 
+# TODO: Add LLM-based contextualization
 class ContextualChunker(DocumentChunker):
     """
     Advanced chunker that adds context to each chunk.
@@ -169,9 +263,13 @@ class ContextualChunker(DocumentChunker):
     """
     
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the ContextualChunker.
+        
+        Extends DocumentChunker with LLM-based contextualization capabilities.
+        """
         super().__init__(*args, **kwargs)
-        # TODO: Add LLM for contextualization
-        # self.llm = ChatOpenAI(model="gpt-4o-mini")
+        # self.llm = ChatOpenAI(model=config.MODEL)
     
     def add_context(self, chunks: List[Document], full_document: str) -> List[Document]:
         """
@@ -184,8 +282,7 @@ class ContextualChunker(DocumentChunker):
         Returns:
             Chunks with added context in metadata
         """
-        # Placeholder for contextual chunking
-        # This would use the CONTEXTUALIZER_PROMPT from config.py
+        # TODO: Use CONTEXTUALIZER_PROMPT from config.py
         
         for chunk in chunks:
             chunk.metadata['document_summary'] = self._generate_summary(full_document)
@@ -194,5 +291,5 @@ class ContextualChunker(DocumentChunker):
     
     def _generate_summary(self, text: str, max_length: int = 200) -> str:
         """Generate brief summary of text."""
-        # Simple truncation for now - replace with LLM call
+        # TODO: Simple truncation for now - replace with LLM call
         return text[:max_length] + "..." if len(text) > max_length else text

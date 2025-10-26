@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+
+# VSCode
+.vscode/
+
+# Vector indexes
+chroma*/
+bm25*/
+
+# Virtual environment
+venv/
+.env
+
+# Data
+data/raw*/*
+data/processed*/*
+!data/sample/*
+
+tests/
+.git/
+.gitignore
+
+notes.txt
+test.py
+
