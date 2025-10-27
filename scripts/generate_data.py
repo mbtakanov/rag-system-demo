@@ -1,5 +1,7 @@
 import os
+import re
 import random
+import unicodedata
 from time import sleep
 from datetime import datetime
 import xml.etree.ElementTree as ET
@@ -48,14 +50,25 @@ TOPICS = [
 ]
 
 def generate_report(topic: str) -> str:
-    # The query can be improved to be more specific, detailed, add tables, etc.
-    # (e.g. no meta data, no references, no citations, no summary, no conclusions, no recommendations, etc.)
-    
+    # The query can be improved to be more specific, detailed, add tables, images, etc.
     response = client.responses.create(
         model="gpt-4.1-nano",
         input=[
-            {"role": "system", "content": "You are a professional research report writer."},
-            {"role": "user", "content": f"Write a detailed (at least 5 pages) research report (at least 3000 words) on {topic}."}
+            {
+                "role": "system",
+                "content": "You are a professional research report writer."
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Write a detailed research report of at least 3000 words on '{topic}'. "
+                    "Write only plain text - do not include any figures, images, captions, diagrams, or references "
+                    "(e.g., '(Image: ...)', '(Figure 1)', or similar). "
+                    "Avoid metadata, citations, and formatting markup. "
+                    "Use section headings and paragraphs only. "
+                    "Do NOT include a summary, conclusion, or recommendations."
+                )
+            }
         ],
         max_output_tokens=4000,
     )
@@ -68,12 +81,13 @@ def generate_docx_set(n_docs=50):
             text = generate_report(topic)
             doc = Document()
 
-            # TODO: Add metadata and use it later.
             doc.core_properties.subject = topic
             doc.core_properties.created = datetime.now()
             doc.add_heading(f"Report on {topic}", level=1)
             doc.add_paragraph(text)
-            doc.save(os.path.join(DOCX_DIR, f"report_{i+1}.docx"))
+
+            filename = f"{sanitized_title(topic)}_{i+1}.docx"
+            doc.save(os.path.join(DOCX_DIR, filename))
             sleep(1)
         except Exception as e:
             print(f"Error (DOCX {topic}): {e}")
@@ -109,6 +123,7 @@ def download_arxiv_pdfs(n_pdfs=50, min_pages=5, max_pages=20):
                 break
 
             pdf_link = entry.find('{http://www.w3.org/2005/Atom}id').text.replace('/abs/', '/pdf/') + '.pdf'
+            title = entry.find('{http://www.w3.org/2005/Atom}title').text.strip()
             
             try:
                 r = requests.get(pdf_link, timeout=30)
@@ -121,7 +136,9 @@ def download_arxiv_pdfs(n_pdfs=50, min_pages=5, max_pages=20):
                     num_pages = len(reader.pages)
                     
                     if min_pages <= num_pages <= max_pages:
-                        final_path = os.path.join(PDF_DIR, f"doc_{downloaded+1}.pdf")
+                        safe_title = sanitized_title(title)
+                        filename = f"doc_{downloaded+1}_{safe_title}.pdf"
+                        final_path = os.path.join(PDF_DIR, filename)
                         os.rename(temp_path, final_path)
                         downloaded += 1
                     else:
@@ -136,6 +153,15 @@ def download_arxiv_pdfs(n_pdfs=50, min_pages=5, max_pages=20):
         sleep(3)
     
     print(f"Downloaded {downloaded} PDFs.")
+
+def sanitized_title(title: str, max_length: int = 50) -> str:
+    """Convert title to safe filename, handling special chars and unicode."""
+    title = unicodedata.normalize('NFKD', title)
+    title = title.encode('ascii', 'ignore').decode('ascii')
+    title = re.sub(r'[^\w\s-]', '', title)
+    title = re.sub(r'\s+', '_', title.strip())
+    title = re.sub(r'_+', '_', title)
+    return title.lower()[:max_length].strip('_')
 
 if __name__ == "__main__":
     generate_docx_set()

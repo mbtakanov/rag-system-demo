@@ -4,10 +4,6 @@ __pycache__/
 # VSCode
 .vscode/
 
-# Vector indexes
-chroma*/
-bm25*/
-
 # Virtual environment
 venv/
 .env

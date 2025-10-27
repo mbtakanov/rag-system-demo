@@ -8,9 +8,9 @@ import os
 MODEL_NAME="gpt-5-nano"
 MODEL_PROVIDER="openai"
 
-RAW_DATA_DIR = "data/raw"
-DOCX_DIR = "data/raw/docx"
-PDF_DIR = "data/raw/pdf"
+RAW_DATA_DIR = os.path.join("data", "raw")
+DOCX_DIR = os.path.join(RAW_DATA_DIR, "docx")
+PDF_DIR = os.path.join(RAW_DATA_DIR, "pdf")
 
 SAMPLES_DATA_DIR = "data/samples"
 

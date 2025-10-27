@@ -19,7 +19,7 @@ This is a production-ready RAG application that demonstrates enterprise-grade en
 │   │   └── query_expander.py
 │   └── config.py               # Configuration
 ├── scripts/
-│   ├── build_index.py          # Unified pipeline
+│   ├── build.py                # Unified pipeline
 │   ├── generate_data.py        # Dataset generation
 ├── data/
 │   ├── processed/              # Markdown files
@@ -60,10 +60,10 @@ graph LR
 ```
 
 
-### SETUP
+### Setup
 
-For a quick start without generating the full dataset, use the `--samples` flag.
-The full setup generate 100 documents - 50 PDFs from arXiv, 50 DOCXs generated using OpenAI.
+The full setup generate 100 documents - 50 PDFs from arXiv, 50 DOCXs generated using OpenAI. For a quick start without generating the full dataset, use the `--samples` flag.
+
 
 ```bash
 pip install -r requirements.txt
@@ -71,11 +71,14 @@ pip install -r requirements.txt
 # Add your OpenAI API key
 echo "OPENAI_API_KEY=your_api_key" > .env
 
+# Generate dataset (Optional. For quick start, use the samples dataset instead.)
+python -m scripts.generate_data
+
 # Process sample docs (2 files, ~1min to run)
-python -m scripts.build_index --samples
+python -m scripts.build --samples
 
 # Full setup
-python -m scripts.build_index
+python -m scripts.build
 
 # Start API server
 python -m src.api.api
@@ -202,3 +205,20 @@ Run test:
 ```bash
 python -m tests.concurrent_requests
 ```
+
+## Dockerization
+
+The `.env` file is excluded from the Docker image via `.dockerignore`. We are passing sensitive credentials at runtime using `--env-file` or `-e` flags.
+
+Before running the Docker container ensure you have processed documents and created indexes (either full or sample dataset):
+
+```bash
+docker build -t rag-system .
+
+# Option 1: Use your .env file
+docker run -p 8000:8000 --env-file .env rag-system
+
+# Option 2: Pass the key directly
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key_here rag-system
+```
+

@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def build_index(use_samples: bool = False):
+def build(use_samples: bool = False):
     """
     Build indexes from documents.
     
@@ -90,5 +90,5 @@ if __name__ == "__main__":
                        help="Use sample documents instead of full dataset")
     args = parser.parse_args()
     
-    success = build_index(use_samples=args.samples)
+    success = build(use_samples=args.samples)
     exit(0 if success else 1)

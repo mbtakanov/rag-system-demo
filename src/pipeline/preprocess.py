@@ -53,6 +53,7 @@ class DocumentPreprocessor:
         Returns:
             Dictionary with processing statistics
         """
+        os.makedirs(input_dir, exist_ok=True)
         os.makedirs(output_dir, exist_ok=True)
         
         stats = {
