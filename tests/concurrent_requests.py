@@ -1,30 +1,16 @@
-# import asyncio
-# import aiohttp
-# import time
-
-
-# async def test_concurrent_requests(n=10):
-#     async with aiohttp.ClientSession() as session:
-#         tasks = [
-#             session.get(f"http://localhost:8000/ask?query=test{i}&k=5")
-#             for i in range(n)
-#         ]
-#         start = time.time()
-#         responses = await asyncio.gather(*tasks)
-#         elapsed = time.time() - start
-#         print(f"{n} requests in {elapsed:.2f}s")
-#         return responses
-
-# asyncio.run(test_concurrent_requests(10))
-
-import asyncio
-import httpx
 import time
+import httpx
+import asyncio
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 
 async def test_concurrent():
     async with httpx.AsyncClient() as client:
         queries = [f"test{i}" for i in range(10)]
-        
+
         start = time.time()
         tasks = [
             client.get(f"http://localhost:8000/ask?query={q}&k=3", timeout=30.0)
@@ -32,16 +18,15 @@ async def test_concurrent():
         ]
         responses = await asyncio.gather(*tasks)
         elapsed = time.time() - start
-        
-        print(f"\n✓ {len(responses)} requests in {elapsed:.2f}s\n")
-        
+
+        logger.info(f"\n{len(responses)} requests in {elapsed:.2f}s\n")
+
         for i, resp in enumerate(responses):
-            print(f"--- Response {i} ---")
-            # Streaming responses come as newline-delimited JSON
-            for line in resp.text.strip().split('\n'):
+            logger.info(f"--- Response {i} ---")
+            for line in resp.text.strip().split("\n"):
                 if line:
-                    print(line)
-            print()
+                    logger.info(line)
+
 
 if __name__ == "__main__":
     asyncio.run(test_concurrent())

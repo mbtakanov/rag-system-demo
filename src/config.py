@@ -5,8 +5,8 @@ This ensures consistency across all modules and makes it easy to update paths.
 
 import os
 
-MODEL_NAME="gpt-5-nano"
-MODEL_PROVIDER="openai"
+MODEL_NAME = "gpt-5-nano"
+MODEL_PROVIDER = "openai"
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 DOCX_DIR = os.path.join(RAW_DATA_DIR, "docx")
