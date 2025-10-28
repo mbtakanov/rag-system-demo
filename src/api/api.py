@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import random
+import uvicorn
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Iterator, Optional
@@ -139,7 +140,7 @@ async def health():
 )
 async def ask(
     query: str = Query(..., min_length=1, max_length=500, description="Your question"),
-    k: int = Query(5, ge=1, le=20, description="Number of context chunks"),
+    k: int = Query(5, ge=1, le=10, description="Number of context chunks"),
     alpha: float = Query(0.5, ge=0.0, le=1.0, description="Vector search weight (0-1)"),
     expand_query: bool = Query(False, description="Enable query expansion"),
 ):
@@ -147,7 +148,7 @@ async def ask(
     Ask a question and get a streaming answer.
 
     - **query**: Your question
-    - **k**: Number of context chunks to retrieve (1-20)
+    - **k**: Number of context chunks to retrieve (1-10)
     - **alpha**: Weight for vector search vs BM25 (0=only BM25, 1=only vector)
     - **expand_query**: Enable query expansion
 
@@ -164,10 +165,10 @@ async def ask(
             for json_chunk in generate_answer(
                 query, k=k, alpha=alpha, expand_query=expand_query
             ):
-                yield f"{json.dumps(json_chunk)}\n"
-            yield f"{json.dumps({'type': 'done'})}\n"
+                yield f"{json.dumps(json_chunk)}\n\n"
+            yield f"{json.dumps({'type': 'done'})}\n\n"
         except Exception as e:
-            yield f"{json.dumps({'type': 'error', 'data': str(e)})}\n"
+            yield f"{json.dumps({'type': 'error', 'data': str(e)})}\n\n"
 
     return StreamingResponse(
         response_stream(),
@@ -183,7 +184,7 @@ async def ask(
 )
 async def search(
     query: str = Query(..., min_length=1, max_length=500),
-    k: int = Query(5, ge=1, le=20),
+    k: int = Query(5, ge=1, le=10),
     alpha: float = Query(0.5, ge=0.0, le=1.0),
     file_type: Optional[str] = Query(
         None, description="Filter by file type (pdf, docx, md)"
@@ -192,7 +193,6 @@ async def search(
 ):
     """
     Search for relevant document chunks without generating an answer.
-    Useful for debugging or building custom applications.
     """
     try:
         # TODO: Storing and filtering by metadata must be improved.
@@ -265,6 +265,4 @@ async def random_metadata():
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)
