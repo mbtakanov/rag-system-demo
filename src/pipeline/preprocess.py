@@ -4,6 +4,7 @@ Converts documents to markdown format using Docling.
 """
 
 import os
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -15,6 +16,8 @@ from docling.datamodel.pipeline_options import (
 )
 from docling.document_converter import PdfFormatOption
 
+
+logger = logging.getLogger(__name__)
 
 class DocumentPreprocessor:
     def __init__(self, 
@@ -62,18 +65,21 @@ class DocumentPreprocessor:
             'failed': 0,
             'skipped': 0
         }
+
+        file_paths = []
+        for root, _, filenames in os.walk(input_dir):
+            for filename in filenames:
+                if filename.lower().endswith(file_extensions):
+                    file_paths.append(os.path.join(root, filename))
         
-        files = [f for f in os.listdir(input_dir) 
-                if f.lower().endswith(file_extensions)]
-        
-        for filename in files:
+        for input_path in file_paths:
             stats['total'] += 1
-            input_path = os.path.join(input_dir, filename)
+            filename = os.path.basename(input_path)
             
             text = self._extract(input_path)
             
             if not text or not text.strip():
-                print(f"[WARN] No text extracted from {filename}")
+                logger.warning(f"No text extracted from {filename}")
                 stats['failed'] += 1
                 continue
             
@@ -85,7 +91,7 @@ class DocumentPreprocessor:
                     f.write(text)
                 stats['successful'] += 1
             except Exception as e:
-                print(f"[ERROR] Failed to save {output_filename}: {e}")
+                logger.exception(f"Failed to save {output_filename}: {e}")
                 stats['failed'] += 1
         
         return stats
@@ -114,7 +120,7 @@ class DocumentPreprocessor:
             markdown_text = result.document.export_to_markdown()
             return self._clean_text(markdown_text)
         except Exception as e:
-            print(f"[ERROR] PDF extraction failed for {file_path}: {e}")
+            logger.exception(f"PDF extraction failed for {file_path}: {e}")
             return None
     
     def _extract_docx(self, file_path: str) -> Optional[str]:
@@ -123,7 +129,7 @@ class DocumentPreprocessor:
             markdown_text = result.document.export_to_markdown()
             return self._clean_text(markdown_text)
         except Exception as e:
-            print(f"[ERROR] DOCX extraction failed for {file_path}: {e}")
+            logger.exception(f"DOCX extraction failed for {file_path}: {e}")
             return None
     
     def _extract(self, file_path: str) -> Optional[str]:
@@ -134,7 +140,7 @@ class DocumentPreprocessor:
         elif extension == '.docx':
             return self._extract_docx(file_path)
         else:
-            print(f"[WARN] Unsupported file format: {extension}")
+            logger.warning(f"Unsupported file format: {extension}")
             return None
     
     def _clean_text(self, text: str) -> str:

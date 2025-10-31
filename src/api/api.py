@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import random
+import uvicorn
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Iterator, Optional
@@ -18,16 +19,14 @@ from src.api.models import (
     SearchResponse,
     SearchResultItem,
     MetadataResponse,
-    RootResponse
+    RootResponse,
 )
 
 load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
 
@@ -57,10 +56,7 @@ app = FastAPI(title="RAG API", lifespan=lifespan)
 
 
 def generate_answer(
-    query: str,
-    k: int = 5,
-    alpha: float = 0.5,
-    expand_query: bool = False
+    query: str, k: int = 5, alpha: float = 0.5, expand_query: bool = False
 ) -> Iterator[dict]:
     try:
         results = app.ranker.search(
@@ -68,52 +64,55 @@ def generate_answer(
             k=k,
             alpha=alpha,
             metadata_filter=None,
-            use_query_expansion=expand_query
+            use_query_expansion=expand_query,
         )
-        
+
         if not results:
             yield {"type": "error", "data": "No relevant context found"}
             return
-        
+
         scores_data = [
             {
                 "chunk_index": i,
                 "score": round(float(score), 2),
-                "content_preview": content[:100] + "..."
+                "content_preview": content[:100] + "...",
             }
             for i, (content, score) in enumerate(results)
         ]
         yield {"type": "metadata", "data": {"retrieval_scores": scores_data}}
-        
-        context = "\n".join(f"<context>{content}</context>" for content, _score in results)
+
+        context = "\n".join(
+            f"<context>{content}</context>" for content, _score in results
+        )
         prompt = RAG_PROMPT.format(context=context, query=query)
-        
+
         for chunk in app.llm.stream(prompt):
             yield {"type": "content", "data": chunk.content}
-    
+
     except Exception as e:
         logger.exception(f"Error in generate_answer: {e}")
         yield {"type": "error", "data": str(e)}
 
-@app.get("/health",
-    description="Health check",
-    response_model=HealthResponse)
+
+@app.get("/health", description="Health check", response_model=HealthResponse)
 async def health():
     try:
-        if not hasattr(app, 'llm') or not hasattr(app, 'ranker'):
+        if not hasattr(app, "llm") or not hasattr(app, "ranker"):
             return HealthResponse(status="unhealthy", error="Resources not loaded")
-        
+
         return HealthResponse(
             status="healthy",
             model=MODEL,
             provider=MODEL_PROVIDER,
             vector_db="chroma",
-            documents_indexed=app.ranker.vector_store.db._collection.count()
+            documents_indexed=app.ranker.vector_store.db._collection.count(),
         )
     except Exception as e:
         return HealthResponse(status="unhealthy", error=str(e))
 
-@app.get("/ask",
+
+@app.get(
+    "/ask",
     summary="Ask a question",
     description="""
     Ask a question and get a streaming answer with source attribution.
@@ -132,24 +131,24 @@ async def health():
                 "text/event-stream": {
                     "schema": {
                         "type": "string",
-                        "example": '{"type":"metadata","data":{"retrieval_scores":[...]}}\n{"type":"content","data":"Answer..."}\n{"type":"done"}'
+                        "example": '{"type":"metadata","data":{"retrieval_scores":[...]}}\n{"type":"content","data":"Answer..."}\n{"type":"done"}',
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 async def ask(
     query: str = Query(..., min_length=1, max_length=500, description="Your question"),
-    k: int = Query(5, ge=1, le=20, description="Number of context chunks"),
+    k: int = Query(5, ge=1, le=10, description="Number of context chunks"),
     alpha: float = Query(0.5, ge=0.0, le=1.0, description="Vector search weight (0-1)"),
-    expand_query: bool = Query(False, description="Enable query expansion")
+    expand_query: bool = Query(False, description="Enable query expansion"),
 ):
     """
     Ask a question and get a streaming answer.
-    
+
     - **query**: Your question
-    - **k**: Number of context chunks to retrieve (1-20)
+    - **k**: Number of context chunks to retrieve (1-10)
     - **alpha**: Weight for vector search vs BM25 (0=only BM25, 1=only vector)
     - **expand_query**: Enable query expansion
 
@@ -160,14 +159,16 @@ async def ask(
     """
     if not query.strip():
         raise HTTPException(400, "Query cannot be empty")
-        
+
     def response_stream():
         try:
-            for json_chunk in generate_answer(query, k=k, alpha=alpha, expand_query=expand_query):
-                yield f"{json.dumps(json_chunk)}\n"
-            yield f"{json.dumps({'type': 'done'})}\n"
+            for json_chunk in generate_answer(
+                query, k=k, alpha=alpha, expand_query=expand_query
+            ):
+                yield f"{json.dumps(json_chunk)}\n\n"
+            yield f"{json.dumps({'type': 'done'})}\n\n"
         except Exception as e:
-            yield f"{json.dumps({'type': 'error', 'data': str(e)})}\n"
+            yield f"{json.dumps({'type': 'error', 'data': str(e)})}\n\n"
 
     return StreamingResponse(
         response_stream(),
@@ -175,20 +176,23 @@ async def ask(
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
-@app.get("/search",
+
+@app.get(
+    "/search",
     summary="Search for relevant chunks",
     response_model=SearchResponse,
 )
 async def search(
     query: str = Query(..., min_length=1, max_length=500),
-    k: int = Query(5, ge=1, le=20),
+    k: int = Query(5, ge=1, le=10),
     alpha: float = Query(0.5, ge=0.0, le=1.0),
-    file_type: Optional[str] = Query(None, description="Filter by file type (pdf, docx, md)"),
-    expand_query: bool = Query(False, description="Enable query expansion")
+    file_type: Optional[str] = Query(
+        None, description="Filter by file type (pdf, docx, md)"
+    ),
+    expand_query: bool = Query(False, description="Enable query expansion"),
 ):
     """
     Search for relevant document chunks without generating an answer.
-    Useful for debugging or building custom applications.
     """
     try:
         # TODO: Storing and filtering by metadata must be improved.
@@ -198,26 +202,25 @@ async def search(
             k=k,
             alpha=alpha,
             metadata_filter=metadata_filter,
-            use_query_expansion=expand_query
+            use_query_expansion=expand_query,
         )
-        
+
         formatted_results = [
-            SearchResultItem(content=content, score=round(score, 2)) for content, score in results
+            SearchResultItem(content=content, score=round(score, 2))
+            for content, score in results
         ]
-        
+
         return SearchResponse(
             query=query,
             num_results=len(formatted_results),
             results=formatted_results,
-            expanded=expand_query
+            expanded=expand_query,
         )
     except Exception as e:
         raise HTTPException(500, str(e))
 
-@app.get("/",
-    summary="Root endpoint",
-    response_model=RootResponse
-)
+
+@app.get("/", summary="Root endpoint", response_model=RootResponse)
 async def root():
     return RootResponse(
         message="RAG API",
@@ -227,7 +230,7 @@ async def root():
             "GET /health": "Health check",
             "ask": "GET /ask?query=... - Ask a questions",
             "GET /search": "Search for chunks (no LLM)",
-            "GET /random-metadata": "Get metadata from a random document"
+            "GET /random-metadata": "Get metadata from a random document",
         },
         examples={
             "root": "/",
@@ -235,29 +238,31 @@ async def root():
             "ask": "/ask?query=ML&expand_query=True",
             "ask": "/ask?query=What is machine learning&k=5&alpha=0.5",
             "search": "/search?query=neural networks&file_type=md",
-            "random-metadata": "/random-metadata"
-        })
+            "random-metadata": "/random-metadata",
+        },
+    )
 
-@app.get("/random-metadata",
+
+@app.get(
+    "/random-metadata",
     summary="Get metadata from a random document",
-    response_model=MetadataResponse
+    response_model=MetadataResponse,
 )
 async def random_metadata():
     """Get metadata from a random document."""
     try:
         if not app.ranker.bm25_store.documents:
             raise HTTPException(500, "No documents indexed")
-        
+
         random_doc = random.choice(app.ranker.bm25_store.documents)
-        
+
         return MetadataResponse(
             metadata=random_doc.metadata,
-            content_preview=random_doc.page_content[:200] + "..."
+            content_preview=random_doc.page_content[:200] + "...",
         )
     except Exception as e:
         raise HTTPException(500, str(e))
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

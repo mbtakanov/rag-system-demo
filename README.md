@@ -2,34 +2,54 @@
 
 This is a production-ready RAG application that demonstrates enterprise-grade engineering practices, advanced retrieval techniques, and scalable architecture design. This assessment evaluates my ability to build robust AI systems that can transition from prototype to production.
 
+
+## Live Demo
+
+**Try it now:** [https://rag-system.takanov.com/](https://rag-system.takanov.com/)
+
+
 ## Project Structure
 
 ```
 ├── src/
 │   ├── api/
 │   │   └── api.py              # FastAPI endpoints
+|   |
 │   ├── pipeline/               # Document processing
 │   │   ├── chunk.py            # Chunking strategies
 │   │   ├── ingest.py           # Document loading
 │   │   └── preprocess.py       # PDF/DOCX → Markdown
+│   |
 │   ├── retrieval/              # Search components
 │   │   ├── vector_store.py
 │   │   ├── bm25_store.py
 │   │   ├── hybrid_ranker.py
 │   │   └── query_expander.py
+|   |
+│   ├── ui/                     # UI components
+│   │   └── app.py              # Streamlit app
+│   │   └── config.py           # UI configuration
+|   |
 │   └── config.py               # Configuration
+|   |
 ├── scripts/
 │   ├── build.py                # Unified pipeline
 │   ├── generate_data.py        # Dataset generation
+|   |
 ├── data/
 │   ├── processed/              # Markdown files
 │   ├── raw/                    # Generated documents
 │   └── samples/                # Sample documents
+|   |
 ├── tests/
 │   └── concurrent_requests.py  # Test concurrent requests
-├── Dockerfile                  # Docker configuration
-├── README2.md                  # This file
-└── requirements.txt            # Project dependencies
+|   |
+├── Dockerfile.api              # Docker configuration for API
+├── Dockerfile.ui               # Docker configuration for UI
+├── README.md                   # This file
+├── requirements.txt            # Shared dependencies
+├── requirements-ui.txt         # UI dependencies
+└── requirements-api.txt        # API dependencies
 ```
 
 ## RAG Architecture
@@ -66,7 +86,8 @@ The full setup generate 100 documents - 50 PDFs from arXiv, 50 DOCXs generated u
 
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-api.txt
+pip install -r requirements-ui.txt
 
 # Add your OpenAI API key
 echo "OPENAI_API_KEY=your_api_key" > .env
@@ -208,17 +229,29 @@ python -m tests.concurrent_requests
 
 ## Dockerization
 
+### API Dockerization
+
 The `.env` file is excluded from the Docker image via `.dockerignore`. We are passing sensitive credentials at runtime using `--env-file` or `-e` flags.
 
 Before running the Docker container ensure you have processed documents and created indexes (either full or sample dataset):
 
 ```bash
-docker build -t rag-system .
+docker build -f Dockerfile.api -t rag-system-api .
 
 # Option 1: Use your .env file
-docker run -p 8000:8000 --env-file .env rag-system
+docker run -p 8000:8000 --env-file .env rag-system-api
 
 # Option 2: Pass the key directly
-docker run -p 8000:8000 -e OPENAI_API_KEY=your_key_here rag-system
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key_here rag-system-api
 ```
 
+### UI Dockerization
+
+```bash
+docker build -f Dockerfile.ui -t rag-system-ui .
+docker run -p 8501:8501 rag-system-ui
+
+docker run -p 8501:8501
+```
+
+**Note:** The UI reads `API_URL` from `src/ui/config.py`, which checks `ENVIRONMENT` variable.
